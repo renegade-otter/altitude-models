@@ -1,0 +1,55 @@
+# altitude-models
+
+The model files of [Altitude](https://github.com/papito/altitude). They are published as the assets of tagged
+releases, not committed: four are over git's 100 MB limit, and Git LFS bandwidth is metered. This repository holds the
+script that makes them and this page.
+
+A release's file is at:
+
+    https://github.com/renegade-otter/altitude-models/releases/download/<tag>/<file>
+
+## The files
+
+| File | Size | What it is | Source | Licence |
+|---|---|---|---|---|
+| `dinov2_vitb14.onnx` | 346 MB | DINOv2 ViT-B/14, the pooled CLS token (768 floats): a Scene model | [`facebook/dinov2-base`](https://huggingface.co/facebook/dinov2-base), exported to ONNX | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| `siglip2_b16_256_image.onnx` | 372 MB | SigLIP 2 ViT-B/16 image tower at 256 px, its pooled output (768 floats): a Scene model | [`google/siglip2-base-patch16-256`](https://huggingface.co/google/siglip2-base-patch16-256), exported to ONNX | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
+| `siglip2_b16_256_text.onnx` | 343 MB | The same checkpoint's text tower, without its token-embedding table: a description's embedding | `google/siglip2-base-patch16-256`, exported to ONNX | Apache 2.0 |
+| `siglip2_token_embeddings.f16` | 393 MB | That table: 256,000 rows of 768 little-endian float16, row = token ID | `google/siglip2-base-patch16-256` | Apache 2.0 |
+| `siglip2_tokenizer.tsv` | 6 MB | The checkpoint's tokenizer, a line per piece: ID, merge score, matched whole, piece | `google/siglip2-base-patch16-256` | Apache 2.0 |
+| `face_detection_yunet_2023mar.onnx` | 233 kB | YuNet, the face detector: face boxes and five landmarks | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet) at commit `f12e127`, as published | [MIT](https://github.com/opencv/opencv_zoo/blob/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet/LICENSE), Copyright (c) 2020 Shiqi Yu |
+| `SHA256SUMS` | | The SHA-256 of each file above, in the format of `sha256sum` | | |
+
+The four SigLIP 2 files are one checkpoint split for the way Altitude reads it: the table stays out of the text tower's
+graph so that it can be mapped into memory, where a description reads 64 of its rows. `export-models.py` describes each
+file's inputs, outputs and format, and the checks an export passes against PyTorch before it is written.
+
+To check a downloaded set:
+
+    sha256sum -c SHA256SUMS
+
+## How Altitude uses a release
+
+Altitude pins one release tag and, for every file, its URL, its size and its SHA-256, in code. It downloads the files it
+is missing once, into its models directory, and checks each against its pin. The pins in the application are what is
+trusted; `SHA256SUMS` is for people.
+
+A release is never changed once the application pins it. A new set of files, even one re-exported from the same
+checkpoints (an export is not byte for byte the same across versions of torch), is a new tag, and the application moves
+to it with new pins.
+
+## Making a release
+
+    uv run export-models.py
+    gh release create vN dist/* --title vN --notes "..."
+
+`export-models.py` downloads YuNet from its pinned commit and checks it against its pinned SHA-256, exports the Scene
+models and SigLIP 2's text side from their Hugging Face checkpoints, checking each export against PyTorch, and writes
+everything with `SHA256SUMS` into `dist/`, which git ignores. Its dependencies are pinned in its header; `uv` installs
+them, the CPU build of torch among them. `uv run export-models.py --help` lists its options.
+
+## Why ArcFace is not here
+
+Altitude's face embedding net is ArcFace, InsightFace's `w600k_r50`. Its licence is InsightFace's non-commercial
+research licence, so it is not re-hosted here: the application downloads it from the pinned Hugging Face revision it is
+tuned with, and checks it against its pinned SHA-256.
