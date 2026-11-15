@@ -1,0 +1,35 @@
+altitude-models
+
+The model files of Altitude, published as the assets of the releases of
+https://github.com/renegade-otter/altitude-models. Each file is listed with its upstream source, what was done to it,
+and the file that holds its licence.
+
+dinov2_vitb14.onnx
+    Source:   DINOv2 ViT-B/14, the Hugging Face checkpoint facebook/dinov2-base
+              (https://huggingface.co/facebook/dinov2-base)
+    Changes:  converted from the original checkpoint to ONNX, giving the pooled CLS token
+    Licence:  Apache License 2.0, in LICENSE-APACHE-2.0
+
+siglip2_b16_256_image.onnx
+    Source:   SigLIP 2 ViT-B/16 at 256 px, the Hugging Face checkpoint google/siglip2-base-patch16-256
+              (https://huggingface.co/google/siglip2-base-patch16-256)
+    Changes:  the vision tower converted from the original checkpoint to ONNX, giving its pooled output
+    Licence:  Apache License 2.0, in LICENSE-APACHE-2.0
+
+siglip2_b16_256_text.onnx
+siglip2_token_embeddings.f16
+siglip2_tokenizer.tsv
+    Source:   the same checkpoint, google/siglip2-base-patch16-256
+    Changes:  the text side of the original checkpoint split into three files: the text tower without its
+              token-embedding table, converted to ONNX; that table, converted to float16 and written as a raw array of
+              256,000 rows of 768 values; and the checkpoint's tokenizer, rewritten as a table of its pieces
+    Licence:  Apache License 2.0, in LICENSE-APACHE-2.0
+
+face_detection_yunet_2023mar.onnx
+    Source:   YuNet, OpenCV Zoo at commit f12e12798e8314f7c074a6656816c048dcc95b7a
+              (https://github.com/opencv/opencv_zoo/tree/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet)
+    Changes:  none, the file as published there
+    Licence:  MIT License, Copyright (c) 2020 Shiqi Yu, in LICENSE-YUNET-MIT
+
+The Hugging Face revision of the checkpoints a release is exported from is recorded per release in the repository's
+README.md. Release v1 was exported before the revisions were pinned, so its revision is not recorded.

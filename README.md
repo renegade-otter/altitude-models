@@ -12,13 +12,14 @@ A release's file is at:
 
 | File | Size | What it is | Source | Licence |
 |---|---|---|---|---|
-| `dinov2_vitb14.onnx` | 346 MB | DINOv2 ViT-B/14, the pooled CLS token (768 floats): a Scene model | [`facebook/dinov2-base`](https://huggingface.co/facebook/dinov2-base), exported to ONNX | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
-| `siglip2_b16_256_image.onnx` | 372 MB | SigLIP 2 ViT-B/16 image tower at 256 px, its pooled output (768 floats): a Scene model | [`google/siglip2-base-patch16-256`](https://huggingface.co/google/siglip2-base-patch16-256), exported to ONNX | [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
-| `siglip2_b16_256_text.onnx` | 343 MB | The same checkpoint's text tower, without its token-embedding table: a description's embedding | `google/siglip2-base-patch16-256`, exported to ONNX | Apache 2.0 |
-| `siglip2_token_embeddings.f16` | 393 MB | That table: 256,000 rows of 768 little-endian float16, row = token ID | `google/siglip2-base-patch16-256` | Apache 2.0 |
-| `siglip2_tokenizer.tsv` | 6 MB | The checkpoint's tokenizer, a line per piece: ID, merge score, matched whole, piece | `google/siglip2-base-patch16-256` | Apache 2.0 |
-| `face_detection_yunet_2023mar.onnx` | 233 kB | YuNet, the face detector: face boxes and five landmarks | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet) at commit `f12e127`, as published | [MIT](https://github.com/opencv/opencv_zoo/blob/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet/LICENSE), Copyright (c) 2020 Shiqi Yu |
+| `dinov2_vitb14.onnx` | 346 MB | DINOv2 ViT-B/14, the pooled CLS token (768 floats): a Scene model | [`facebook/dinov2-base`](https://huggingface.co/facebook/dinov2-base), exported to ONNX | [Apache 2.0](LICENSE-APACHE-2.0) |
+| `siglip2_b16_256_image.onnx` | 372 MB | SigLIP 2 ViT-B/16 image tower at 256 px, its pooled output (768 floats): a Scene model | [`google/siglip2-base-patch16-256`](https://huggingface.co/google/siglip2-base-patch16-256), exported to ONNX | [Apache 2.0](LICENSE-APACHE-2.0) |
+| `siglip2_b16_256_text.onnx` | 343 MB | The same checkpoint's text tower, without its token-embedding table: a description's embedding | `google/siglip2-base-patch16-256`, exported to ONNX | [Apache 2.0](LICENSE-APACHE-2.0) |
+| `siglip2_token_embeddings.f16` | 393 MB | That table: 256,000 rows of 768 little-endian float16, row = token ID | `google/siglip2-base-patch16-256` | [Apache 2.0](LICENSE-APACHE-2.0) |
+| `siglip2_tokenizer.tsv` | 6 MB | The checkpoint's tokenizer, a line per piece: ID, merge score, matched whole, piece | `google/siglip2-base-patch16-256` | [Apache 2.0](LICENSE-APACHE-2.0) |
+| `face_detection_yunet_2023mar.onnx` | 233 kB | YuNet, the face detector: face boxes and five landmarks | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/f12e12798e8314f7c074a6656816c048dcc95b7a/models/face_detection_yunet) at commit `f12e127`, as published | [MIT](LICENSE-YUNET-MIT), Copyright (c) 2020 Shiqi Yu |
 | `SHA256SUMS` | | The SHA-256 of each file above, in the format of `sha256sum` | | |
+| `LICENSE-APACHE-2.0`, `LICENSE-YUNET-MIT`, `NOTICE` | | The licences of the files above and a notice of their sources, as in this repository | | |
 
 The four SigLIP 2 files are one checkpoint split for the way Altitude reads it: the table stays out of the text tower's
 graph so that it can be mapped into memory, where a description reads 64 of its rows. `export-models.py` describes each
@@ -28,13 +29,22 @@ To check a downloaded set:
 
     sha256sum -c SHA256SUMS
 
+## Licences
+
+The DINOv2 and SigLIP 2 files are derived from their checkpoints, which are under the Apache License 2.0: the text is
+in [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0). YuNet is under the MIT License, in
+[`LICENSE-YUNET-MIT`](LICENSE-YUNET-MIT), the licence file of YuNet's directory in OpenCV Zoo at the pinned commit.
+[`NOTICE`](NOTICE) lists each file's source and what was done to it: the DINOv2 and SigLIP 2 files are converted to
+ONNX from the original checkpoints, and SigLIP 2's text side is split into a text tower, a float16 token-embedding
+table and a tokenizer table. The three files are attached to every release beside the model files.
+
 ## How Altitude uses a release
 
 Altitude pins one release tag and, for every file, its URL, its size and its SHA-256, in code. It downloads the files it
 is missing once, into its models directory, and checks each against its pin. The pins in the application are what is
 trusted; `SHA256SUMS` is for people.
 
-A release is never changed once the application pins it. A new set of files, even one re-exported from the same
+A release's model files are never changed once the application pins them. A new set of files, even one re-exported from the same
 checkpoints (an export is not byte for byte the same across versions of torch), is a new tag, and the application moves
 to it with new pins.
 
