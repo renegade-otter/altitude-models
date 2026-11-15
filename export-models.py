@@ -85,8 +85,12 @@ Run:
     uv run export-models.py [--force] [path/to/sample.jpg]
 
 A file already in `dist/` is skipped, so a run that failed part of the way picks up where it stopped: YuNet when its
-SHA-256 matches, a Scene model when its file exists, the text side when its three files exist. `--force` downloads and
-exports them all again. `SHA256SUMS` is written again on every run, over the files as they are in `dist/` at its end.
+SHA-256 matches, a Scene model when its file exists, the text side when its three files exist. The skip goes by name
+alone, so a release starts from an empty `dist/`, or `--force` downloads and exports them all again. `SHA256SUMS` is
+written again on every run, over the release files (`RELEASE_FILES`) as they are in `dist/` at its end. Before it is
+written the run fails, removing any `SHA256SUMS` already there, if `dist/` holds anything but the release files: the
+leftover `.part` or `.unchecked` file of a killed run, or a file of an earlier release, which an upload of `dist/`
+would ship.
 The sample defaults to a photo from OpenCV's samples (`SAMPLE`), downloaded at a pinned commit into a temporary
 directory and checked against its pinned SHA-256. The first run downloads the CPU build of torch into uv's cache, and an
 export its checkpoint (a few hundred MB) into Hugging Face's cache. The versions pinned above are the newest at the time
@@ -599,6 +603,18 @@ RELEASE_FILES = [
 ]
 
 
+def check_no_strays() -> None:
+    """Fails, removing any `SHA256SUMS`, unless `dist/` holds the release files and `SHA256SUMS` alone."""
+    expected = {*RELEASE_FILES, CHECKSUMS_FILE}
+    strays = sorted(path.name for path in OUTPUT_DIR.iterdir() if path.name not in expected or not path.is_file())
+    if strays:
+        (OUTPUT_DIR / CHECKSUMS_FILE).unlink(missing_ok=True)
+        raise SystemExit(
+            f"{OUTPUT_DIR.relative_to(REPO_ROOT)} holds files that are not release files: {', '.join(strays)}."
+            " Remove them and run again; the release files in place are skipped."
+        )
+
+
 def write_checksums() -> None:
     """Writes `SHA256SUMS` over the files of a release, a line per file as `sha256sum` writes one."""
     lines = [f"{sha256_of(OUTPUT_DIR / name)}  {name}\n" for name in RELEASE_FILES]
@@ -630,6 +646,7 @@ def main() -> None:
         for spec in MODELS:
             export(spec, sample, args.force)
     export_text(args.force)
+    check_no_strays()
     write_checksums()
 
 

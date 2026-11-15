@@ -44,19 +44,34 @@ Altitude pins one release tag and, for every file, its URL, its size and its SHA
 is missing once, into its models directory, and checks each against its pin. The pins in the application are what is
 trusted; `SHA256SUMS` is for people.
 
-A release's model files are never changed once the application pins them. A new set of files, even one re-exported from the same
-checkpoints (an export is not byte for byte the same across versions of torch), is a new tag, and the application moves
-to it with new pins.
+A release's model files are never changed once the application pins them. A new set of files, even one re-exported
+from the same checkpoints (an export is not byte for byte the same across versions of torch), is a new tag, and the
+application moves to it with new pins.
 
 ## Making a release
 
+    rm -rf dist
     uv run export-models.py
-    gh release create vN dist/* --title vN --notes "..."
+    gh release create vN --title vN --notes "..." \
+        dist/dinov2_vitb14.onnx \
+        dist/siglip2_b16_256_image.onnx \
+        dist/siglip2_b16_256_text.onnx \
+        dist/siglip2_token_embeddings.f16 \
+        dist/siglip2_tokenizer.tsv \
+        dist/face_detection_yunet_2023mar.onnx \
+        dist/SHA256SUMS \
+        LICENSE-APACHE-2.0 LICENSE-YUNET-MIT NOTICE
 
 `export-models.py` downloads YuNet from its pinned commit and checks it against its pinned SHA-256, exports the Scene
 models and SigLIP 2's text side from their Hugging Face checkpoints, checking each export against PyTorch, and writes
 everything with `SHA256SUMS` into `dist/`, which git ignores. Its dependencies are pinned in its header; `uv` installs
 them, the CPU build of torch among them. `uv run export-models.py --help` lists its options.
+
+A release starts from an empty `dist/`. The script skips a file already there by its name alone, so that a run that
+failed part of the way picks up where it stopped; a file left from an earlier release would be shipped again. The
+upload names its files, the ones the script lists in `RELEASE_FILES` with `SHA256SUMS`, and the licences and `NOTICE`
+from the repository. `SHA256SUMS` covers the release files alone, and the script fails without writing it if `dist/`
+holds anything else, such as the `.part` or `.unchecked` file a killed run leaves.
 
 ## Why ArcFace is not here
 
