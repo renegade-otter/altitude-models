@@ -38,6 +38,20 @@ in [`LICENSE-APACHE-2.0`](LICENSE-APACHE-2.0). YuNet is under the MIT License, i
 ONNX from the original checkpoints, and SigLIP 2's text side is split into a text tower, a float16 token-embedding
 table and a tokenizer table. The three files are attached to every release beside the model files.
 
+## Releases
+
+The checkpoint revisions each release is exported from, and the versions of torch and transformers it is exported
+with. YuNet is the file of OpenCV Zoo at commit `f12e12798e8314f7c074a6656816c048dcc95b7a` in every release.
+
+| Tag | `facebook/dinov2-base` | `google/siglip2-base-patch16-256` | torch | transformers |
+|---|---|---|---|---|
+| `v1` | not recorded | not recorded | 2.15.0 | not recorded |
+
+The files of v1 were exported before the checkpoint revisions were pinned, DINOv2's on 2026-11-04 and SigLIP 2's on
+2026-11-14, so v1's exact source revisions are not recorded; its torch version is the one its ONNX files name as their
+producer. Later releases record theirs: the revisions are the ones `export-models.py` pins (`DINOV2_REVISION`,
+`SIGLIP2_REVISION`), and the versions the ones its run prints.
+
 ## How Altitude uses a release
 
 Altitude pins one release tag and, for every file, its URL, its size and its SHA-256, in code. It downloads the files it
@@ -72,6 +86,9 @@ failed part of the way picks up where it stopped; a file left from an earlier re
 upload names its files, the ones the script lists in `RELEASE_FILES` with `SHA256SUMS`, and the licences and `NOTICE`
 from the repository. `SHA256SUMS` covers the release files alone, and the script fails without writing it if `dist/`
 holds anything else, such as the `.part` or `.unchecked` file a killed run leaves.
+
+A new release adds its row to the table under [Releases](#releases), with the revisions `export-models.py` pins and the
+versions of torch and transformers its run prints.
 
 ## Why ArcFace is not here
 

@@ -20,8 +20,8 @@
 # torch = { index = "pytorch-cpu" }
 # ///
 """Makes the assets of a release of Altitude's model files: the face detector, downloaded, and the two Scene models with
-SigLIP 2's text side, exported from their Hugging Face checkpoints. Each is written to `dist/` beside this script, with
-a `SHA256SUMS` over them all. The classes named below are Altitude's.
+SigLIP 2's text side, exported from their Hugging Face checkpoints at pinned revisions. Each is written to `dist/`
+beside this script, with a `SHA256SUMS` over them all. The classes named below are Altitude's.
 
     dist/dinov2_vitb14.onnx                DINOv2 ViT-B/14, facebook/dinov2-base (Apache 2.0), for `OnnxSceneEmbedder`:
                                            the pooled CLS token, 768 floats
@@ -40,7 +40,9 @@ ArcFace, the face embedding net of `FaceDetectionService`, is not among them: it
 non-commercial research licence, so the application downloads it from its own pinned source and it is not hosted here.
 
 YuNet is downloaded from a pinned commit of OpenCV Zoo and checked against its pinned SHA-256; a mismatch fails the run
-and writes nothing.
+and writes nothing. The checkpoints, their weights, configs and tokenizer, are loaded at a pinned Hugging Face revision
+each (`DINOV2_REVISION`, `SIGLIP2_REVISION`), so that a release's source is known and can be exported again;
+README.md records each release's revisions and its versions of torch and transformers, which a run prints.
 
 The Scene models take one input named `image`, float32 of shape [1, 3, side, side] with the model's own side (224 for
 DINOv2, 256 for SigLIP 2), RGB, scaled to 0..1 and normalized per channel with the model's mean and std (all listed in
@@ -113,6 +115,7 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
+import transformers
 from PIL import Image
 from transformers import AutoTokenizer, Dinov2Model, SiglipModel, SiglipVisionModel
 
@@ -203,10 +206,18 @@ def download(spec: DownloadSpec, directory: Path, force: bool) -> Path:
     return path
 
 
+# The Hugging Face checkpoints and the revisions (commits of their repositories) they are loaded at.
+DINOV2_CHECKPOINT = "facebook/dinov2-base"
+DINOV2_REVISION = "f9e44c814b77203eaa57a6bdbbd535f21ede1415"
+SIGLIP2_CHECKPOINT = "google/siglip2-base-patch16-256"
+SIGLIP2_REVISION = "3f9f96cb90da5dbc758b01813f2f6f1aee24c1ab"
+
+
 @dataclass(frozen=True)
 class SceneModelSpec:
     name: str
     checkpoint: str
+    revision: str
     output_file: str
     # The side of the square the model takes, and how an image is fitted to it: "crop" is the short side scaled to the
     # input side and a center crop, "squash" the whole image scaled to the square with its aspect not kept.
@@ -220,11 +231,13 @@ class SceneModelSpec:
         """The checkpoint wrapped so that forward(image) gives the embedding row alone."""
         # Eager attention exports as plain matmul and softmax, which every opset and ONNX Runtime build handles.
         if self.name == "dinov2":
-            model = Dinov2Model.from_pretrained(self.checkpoint, attn_implementation="eager")
+            model = Dinov2Model.from_pretrained(self.checkpoint, revision=self.revision, attn_implementation="eager")
         else:
             # The fixed-resolution SigLIP 2 checkpoints are of the SigLIP architecture; the vision tower's pooled output
             # is its attention-pooling head's, the image embedding the text tower's is compared with.
-            model = SiglipVisionModel.from_pretrained(self.checkpoint, attn_implementation="eager")
+            model = SiglipVisionModel.from_pretrained(
+                self.checkpoint, revision=self.revision, attn_implementation="eager"
+            )
         return _Wrapper(model, lambda out: out.pooler_output)
 
 
@@ -241,7 +254,8 @@ class _Wrapper(torch.nn.Module):
 MODELS = [
     SceneModelSpec(
         name="dinov2",
-        checkpoint="facebook/dinov2-base",
+        checkpoint=DINOV2_CHECKPOINT,
+        revision=DINOV2_REVISION,
         output_file="dinov2_vitb14.onnx",
         input_size=224,
         fit="crop",
@@ -251,7 +265,8 @@ MODELS = [
     ),
     SceneModelSpec(
         name="siglip2",
-        checkpoint="google/siglip2-base-patch16-256",
+        checkpoint=SIGLIP2_CHECKPOINT,
+        revision=SIGLIP2_REVISION,
         output_file="siglip2_b16_256_image.onnx",
         input_size=256,
         fit="squash",
@@ -322,7 +337,7 @@ def rename_colliding_intermediates(path: Path, output_name: str) -> None:
 
 
 def export(spec: SceneModelSpec, sample: Path, force: bool) -> None:
-    print(f"== {spec.name}: {spec.checkpoint}")
+    print(f"== {spec.name}: {spec.checkpoint} at {spec.revision}")
     final_path = OUTPUT_DIR / spec.output_file
     if final_path.is_file() and not force:
         print(f"   {final_path.relative_to(REPO_ROOT)} is in place; skipped")
@@ -369,7 +384,6 @@ def export(spec: SceneModelSpec, sample: Path, force: bool) -> None:
     print(f"   wrote {final_path.relative_to(REPO_ROOT)}: {final_path.stat().st_size / 1_000_000:.1f} MB")
 
 
-TEXT_CHECKPOINT = "google/siglip2-base-patch16-256"
 TEXT_TOWER_FILE = "siglip2_b16_256_text.onnx"
 TOKEN_EMBEDDINGS_FILE = "siglip2_token_embeddings.f16"
 TOKENIZER_FILE = "siglip2_tokenizer.tsv"
@@ -517,13 +531,15 @@ def write_tokenizer(reference, path: Path) -> None:
 
 
 def export_text(force: bool) -> None:
-    print(f"== siglip2 text: {TEXT_CHECKPOINT}")
+    print(f"== siglip2 text: {SIGLIP2_CHECKPOINT} at {SIGLIP2_REVISION}")
     finals = [OUTPUT_DIR / name for name in (TEXT_TOWER_FILE, TOKEN_EMBEDDINGS_FILE, TOKENIZER_FILE)]
     if all(path.is_file() for path in finals) and not force:
         print(f"   {', '.join(path.name for path in finals)} are in place; skipped")
         return
 
-    model = SiglipModel.from_pretrained(TEXT_CHECKPOINT, attn_implementation="eager").eval()
+    model = SiglipModel.from_pretrained(
+        SIGLIP2_CHECKPOINT, revision=SIGLIP2_REVISION, attn_implementation="eager"
+    ).eval()
     scale = float(model.logit_scale.exp().item())
     bias = float(model.logit_bias.item())
     print(f"   t = exp(logit_scale) = {scale!r}, b = logit_bias = {bias!r}")
@@ -538,7 +554,7 @@ def export_text(force: bool) -> None:
     if not np.isfinite(halves).all():
         raise SystemExit("siglip2 text: a token embedding does not fit a float16")
 
-    tokenizer = AutoTokenizer.from_pretrained(TEXT_CHECKPOINT)
+    tokenizer = AutoTokenizer.from_pretrained(SIGLIP2_CHECKPOINT, revision=SIGLIP2_REVISION)
     token_ids = tokenizer(
         CHECK_DESCRIPTIONS, padding="max_length", max_length=MAX_TOKENS, truncation=True, return_tensors="pt"
     )["input_ids"]
@@ -642,7 +658,10 @@ def main() -> None:
     download(YUNET, OUTPUT_DIR, args.force)
     with tempfile.TemporaryDirectory() as scratch:
         sample = args.sample or download(SAMPLE, Path(scratch), force=True)
-        print(f"torch {torch.__version__}, onnx {onnx.__version__}, onnxruntime {ort.__version__}; sample {sample}")
+        print(
+            f"torch {torch.__version__}, transformers {transformers.__version__}, onnx {onnx.__version__},"
+            f" onnxruntime {ort.__version__}; sample {sample}"
+        )
         for spec in MODELS:
             export(spec, sample, args.force)
     export_text(args.force)
